@@ -1,0 +1,68 @@
+# Elixir build files and dependencies
+/_build/
+/deps/
+/rel/
+mix.lock
+
+# Sensitive files - SSH keys and certificates
+/priv/keys/
+/priv/certs/
+/priv/ssl/
+
+# IPSec configuration sensitive files (keep directory structure)
+/priv/ipsec_config/*.conf
+/priv/ipsec_config/*.secrets
+
+
+# Temporary files
+/tmp/
+*.tmp
+
+# Log files
+*.log
+/logs/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Elixir Language Server
+.elixir_ls/
+
+# Coverage reports
+/cover/
+/doc/
+
+# Archive artifacts
+*.ez
+
+# Hex package tarball
+*.tar
+
+# If the VM crashes, it generates a dump
+erl_crash.dump
+
+# Keep directory structure but ignore contents
+# This allows developers to understand the expected layout
+/priv/keys/.gitkeep
+/priv/ipsec_config/.gitkeep
+
+

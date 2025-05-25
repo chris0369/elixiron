@@ -1,0 +1,74 @@
+# AI generated files
+.cursor/
+
+# Virtual environments
+.venv/
+venv/
+
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+mix.lock
+
+# Where third-party dependencies like ExDoc output generated docs.
+/doc/
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+test_sftp_service-*.tar
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# SFTP server sensitive data
+/priv/sftp_server/sftp_data/
+/priv/sftp_server/system_keys/
+
+# IPSec configuration sensitive files (keep directory structure)
+/priv/ipsec_config/*.conf
+/priv/ipsec_config/*.secrets
+
+# Log files
+*.log
+/logs/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Elixir Language Server
+.elixir_ls/
+
+# Keep directory structure but ignore contents
+# This allows developers to understand the expected layout
+/priv/sftp_server/sftp_data/.gitkeep
+/priv/sftp_server/system_keys/.gitkeep
+/priv/ipsec_config/.gitkeep

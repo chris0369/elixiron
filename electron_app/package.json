@@ -1,0 +1,19 @@
+{
+  "name": "electron-channel-app",
+  "version": "1.0.0",
+  "description": "Electron app for interacting with Elixir WebSocket channels",
+  "main": "main.js",
+  "scripts": {
+    "start": "npx electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^28.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+} 

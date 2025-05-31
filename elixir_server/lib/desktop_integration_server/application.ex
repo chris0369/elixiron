@@ -94,7 +94,7 @@ defmodule DesktopIntegrationServer.Router do
         erlang_version: System.version(),
         elixir_version: System.version(),
         node_name: Node.self(),
-        memory_usage: :erlang.memory(),
+        memory_usage: :erlang.memory() |> Enum.into(%{}),
         process_count: :erlang.system_info(:process_count)
       },
       application_info: %{
@@ -132,9 +132,9 @@ defmodule DesktopIntegrationServer.Router do
 
   defp check_sftp_connectivity() do
     try do
-      # Quick connectivity test using the FileStorage adapter
-      case DesktopIntegrationServer.FileStorage.list_files(".", []) do
-        {:ok, _files} -> %{status: "connected", message: "SFTP server reachable"}
+      # Quick connectivity test using the FileManager
+      case DesktopIntegrationServer.FileManager.list_files(".", detailed: false) do
+        {:ok, _files} -> %{status: "connected", message: "SFTP server reachable via FileManager"}
         {:error, :econnrefused} -> %{status: "connection_refused", message: "SFTP server not reachable"}
         {:error, reason} -> %{status: "error", message: "SFTP error: #{inspect(reason)}"}
       end
@@ -267,20 +267,209 @@ defmodule DesktopIntegrationServer.WebSocketHandler do
             {:ok, %{"action" => "list_files", "path" => requested_path}} ->
               Logger.info("#{log_prefix} Matched ACTION: list_files. Path: '#{requested_path}'.")
               path_to_list = if is_nil(requested_path) or requested_path == "", do: ".", else: requested_path
-              Logger.info("#{log_prefix} Calling FileStorage.list_files for path: '#{path_to_list}'")
-              file_list_result = DesktopIntegrationServer.FileStorage.list_files(path_to_list, [])
-              Logger.debug("#{log_prefix} FileStorage.list_files result: #{inspect(file_list_result)}")
+              Logger.info("#{log_prefix} Calling FileManager.list_files for path: '#{path_to_list}'")
+              file_list_result = DesktopIntegrationServer.FileManager.list_files(path_to_list, detailed: false)
+              Logger.debug("#{log_prefix} FileManager.list_files result: #{inspect(file_list_result)}")
 
               response_payload_map =
                 case file_list_result do
                   {:ok, files} ->
-                    %{type: "file_list_response", path: path_to_list, files: files}
+                    %{type: "file_list_response", path: path_to_list, files: files, success: true}
                   {:error, reason} ->
                     Logger.error("#{log_prefix} Error listing files for path '#{path_to_list}': #{inspect(reason)}")
-                    %{type: "file_list_error", path: path_to_list, error: "Failed to list files: #{inspect(reason)}"}
+                    %{type: "file_list_response", path: path_to_list, files: [], success: false, error: "Failed to list files: #{inspect(reason)}"}
                 end
               response_payload_json = Jason.encode!(response_payload_map)
               Logger.info("#{log_prefix} Sending file list response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "create_file", "path" => file_path, "content" => content}} ->
+              Logger.info("#{log_prefix} Matched ACTION: create_file. Path: '#{file_path}'.")
+              create_result = DesktopIntegrationServer.FileManager.create_file(file_path, content)
+              Logger.debug("#{log_prefix} FileManager.create_file result: #{inspect(create_result)}")
+
+              response_payload_map =
+                case create_result do
+                  {:ok, created_path} ->
+                    %{type: "file_create_response", path: created_path, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error creating file '#{file_path}': #{inspect(reason)}")
+                    %{type: "file_create_error", path: file_path, error: "Failed to create file: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending file create response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "read_file", "path" => file_path}} ->
+              Logger.info("#{log_prefix} Matched ACTION: read_file. Path: '#{file_path}'.")
+              read_result = DesktopIntegrationServer.FileManager.read_file(file_path)
+              Logger.debug("#{log_prefix} FileManager.read_file result: #{inspect(read_result)}")
+
+              response_payload_map =
+                case read_result do
+                  {:ok, content} ->
+                    %{type: "file_read_response", path: file_path, content: content, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error reading file '#{file_path}': #{inspect(reason)}")
+                    %{type: "file_read_error", path: file_path, error: "Failed to read file: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending file read response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "update_file", "path" => file_path, "content" => content}} ->
+              Logger.info("#{log_prefix} Matched ACTION: update_file. Path: '#{file_path}'.")
+              update_result = DesktopIntegrationServer.FileManager.update_file(file_path, content)
+              Logger.debug("#{log_prefix} FileManager.update_file result: #{inspect(update_result)}")
+
+              response_payload_map =
+                case update_result do
+                  {:ok, updated_path} ->
+                    %{type: "file_update_response", path: updated_path, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error updating file '#{file_path}': #{inspect(reason)}")
+                    %{type: "file_update_error", path: file_path, error: "Failed to update file: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending file update response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "delete_file", "path" => file_path}} ->
+              Logger.info("#{log_prefix} Matched ACTION: delete_file. Path: '#{file_path}'.")
+              delete_result = DesktopIntegrationServer.FileManager.delete_file(file_path)
+              Logger.debug("#{log_prefix} FileManager.delete_file result: #{inspect(delete_result)}")
+
+              response_payload_map =
+                case delete_result do
+                  {:ok, deleted_path} ->
+                    %{type: "file_delete_response", path: deleted_path, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error deleting file '#{file_path}': #{inspect(reason)}")
+                    %{type: "file_delete_error", path: file_path, error: "Failed to delete file: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending file delete response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "move_file", "source" => source_path, "destination" => dest_path}} ->
+              Logger.info("#{log_prefix} Matched ACTION: move_file. Source: '#{source_path}' -> Destination: '#{dest_path}'.")
+              move_result = DesktopIntegrationServer.FileManager.move_file(source_path, dest_path)
+              Logger.debug("#{log_prefix} FileManager.move_file result: #{inspect(move_result)}")
+
+              response_payload_map =
+                case move_result do
+                  {:ok, moved_path} ->
+                    %{type: "file_move_response", source: source_path, destination: moved_path, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error moving file '#{source_path}' -> '#{dest_path}': #{inspect(reason)}")
+                    %{type: "file_move_error", source: source_path, destination: dest_path, error: "Failed to move file: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending file move response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "copy_file", "source" => source_path, "destination" => dest_path}} ->
+              Logger.info("#{log_prefix} Matched ACTION: copy_file. Source: '#{source_path}' -> Destination: '#{dest_path}'.")
+              copy_result = DesktopIntegrationServer.FileManager.copy_file(source_path, dest_path)
+              Logger.debug("#{log_prefix} FileManager.copy_file result: #{inspect(copy_result)}")
+
+              response_payload_map =
+                case copy_result do
+                  {:ok, copied_path} ->
+                    %{type: "file_copy_response", source: source_path, destination: copied_path, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error copying file '#{source_path}' -> '#{dest_path}': #{inspect(reason)}")
+                    %{type: "file_copy_error", source: source_path, destination: dest_path, error: "Failed to copy file: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending file copy response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "create_directory", "path" => dir_path}} ->
+              Logger.info("#{log_prefix} Matched ACTION: create_directory. Path: '#{dir_path}'.")
+              create_dir_result = DesktopIntegrationServer.FileManager.create_directory(dir_path)
+              Logger.debug("#{log_prefix} FileManager.create_directory result: #{inspect(create_dir_result)}")
+
+              response_payload_map =
+                case create_dir_result do
+                  {:ok, created_path} ->
+                    %{type: "directory_create_response", path: created_path, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error creating directory '#{dir_path}': #{inspect(reason)}")
+                    %{type: "directory_create_error", path: dir_path, error: "Failed to create directory: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending directory create response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "delete_directory", "path" => dir_path, "recursive" => recursive}} ->
+              Logger.info("#{log_prefix} Matched ACTION: delete_directory. Path: '#{dir_path}', Recursive: #{recursive}.")
+              delete_dir_result = DesktopIntegrationServer.FileManager.delete_directory(dir_path, recursive: recursive)
+              Logger.debug("#{log_prefix} FileManager.delete_directory result: #{inspect(delete_dir_result)}")
+
+              response_payload_map =
+                case delete_dir_result do
+                  {:ok, deleted_path} ->
+                    %{type: "directory_delete_response", path: deleted_path, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error deleting directory '#{dir_path}': #{inspect(reason)}")
+                    %{type: "directory_delete_error", path: dir_path, error: "Failed to delete directory: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending directory delete response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "get_file_info", "path" => file_path}} ->
+              Logger.info("#{log_prefix} Matched ACTION: get_file_info. Path: '#{file_path}'.")
+              file_info_result = DesktopIntegrationServer.FileManager.get_file_info(file_path)
+              Logger.debug("#{log_prefix} FileManager.get_file_info result: #{inspect(file_info_result)}")
+
+              response_payload_map =
+                case file_info_result do
+                  {:ok, file_info} ->
+                    %{type: "file_info_response", path: file_path, file_info: file_info, success: true}
+                  {:error, reason} ->
+                    Logger.error("#{log_prefix} Error getting file info for '#{file_path}': #{inspect(reason)}")
+                    %{type: "file_info_error", path: file_path, error: "Failed to get file info: #{inspect(reason)}"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending file info response/error to client: #{response_payload_json}")
+              {:reply, {:text, response_payload_json}, state}
+
+            {:ok, %{"action" => "batch_operations", "operations" => operations}} ->
+              Logger.info("#{log_prefix} Matched ACTION: batch_operations. Operations count: #{length(operations)}.")
+
+              # Convert JSON operations to tuples
+              parsed_operations = Enum.map(operations, fn op ->
+                case op do
+                  %{"type" => "create_file", "path" => path, "content" => content} ->
+                    {:create_file, path, content, []}
+                  %{"type" => "update_file", "path" => path, "content" => content} ->
+                    {:update_file, path, content, []}
+                  %{"type" => "delete_file", "path" => path} ->
+                    {:delete_file, path, []}
+                  %{"type" => "move_file", "source" => source, "destination" => dest} ->
+                    {:move_file, source, dest, []}
+                  %{"type" => "copy_file", "source" => source, "destination" => dest} ->
+                    {:copy_file, source, dest, []}
+                  _ ->
+                    {:unknown_operation, op}
+                end
+              end)
+
+              batch_result = DesktopIntegrationServer.FileManager.batch_operations(parsed_operations)
+              Logger.debug("#{log_prefix} FileManager.batch_operations result: #{inspect(batch_result)}")
+
+              response_payload_map =
+                case batch_result do
+                  {:ok, results} ->
+                    %{type: "batch_operations_response", results: results, success: true}
+                  {:error, {failed_op, partial_results}} ->
+                    Logger.error("#{log_prefix} Error in batch operations at: #{inspect(failed_op)}")
+                    %{type: "batch_operations_error", failed_operation: failed_op, partial_results: partial_results, error: "Batch operation failed"}
+                end
+              response_payload_json = Jason.encode!(response_payload_map)
+              Logger.info("#{log_prefix} Sending batch operations response/error to client: #{response_payload_json}")
               {:reply, {:text, response_payload_json}, state}
 
             {:ok, decoded_msg} ->

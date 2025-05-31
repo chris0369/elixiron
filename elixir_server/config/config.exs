@@ -70,4 +70,23 @@ config :desktop_integration_server, DesktopIntegrationServer.FileStorage,
     user_interaction: System.get_env("SFTP_USER_INTERACTION", "false") == "true" # Allow user interaction
   ]
 
-IO.puts "config/config.exs loaded. Logger level set to :debug. FileStorage and IPsec configured with single-machine development tunnel (127.0.0.1 ↔ 127.0.0.2)."
+# FileManager configuration - High-level CRUD operations
+config :desktop_integration_server, DesktopIntegrationServer.FileManager,
+  # Default operation settings
+  default_file_permissions: System.get_env("FILE_MANAGER_DEFAULT_PERMISSIONS", "644"), # Default file permissions
+  default_directory_permissions: System.get_env("FILE_MANAGER_DEFAULT_DIR_PERMISSIONS", "755"), # Default directory permissions
+
+  # Safety and limits
+  max_file_size_mb: String.to_integer(System.get_env("FILE_MANAGER_MAX_FILE_SIZE_MB", "100")), # Maximum file size for read operations
+  max_batch_operations: String.to_integer(System.get_env("FILE_MANAGER_MAX_BATCH_OPS", "50")), # Maximum operations in a batch
+  enable_backups: System.get_env("FILE_MANAGER_ENABLE_BACKUPS", "true") == "true", # Enable automatic backups
+
+  # Temporary file management
+  temp_file_prefix: System.get_env("FILE_MANAGER_TEMP_PREFIX", "filemanager"), # Prefix for temporary files
+  temp_file_cleanup_interval_ms: String.to_integer(System.get_env("FILE_MANAGER_CLEANUP_INTERVAL_MS", "300000")), # 5 minutes
+
+  # Operation timeouts
+  operation_timeout_ms: String.to_integer(System.get_env("FILE_MANAGER_OPERATION_TIMEOUT_MS", "60000")), # 1 minute per operation
+  batch_operation_timeout_ms: String.to_integer(System.get_env("FILE_MANAGER_BATCH_TIMEOUT_MS", "300000")) # 5 minutes for batch operations
+
+IO.puts "config/config.exs loaded. Logger level set to :debug. FileStorage and IPsec configured with single-machine development tunnel (127.0.0.1 <-> 127.0.0.2)."

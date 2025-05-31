@@ -7,12 +7,14 @@ This directory contains the Elixir/Mix project that provides the backend logic a
 - Starts an HTTP server using Plug/Cowboy.
 - Handles WebSocket connections on `/ws`.
 - Provides secure file operations via SFTP with IPsec tunnel encryption.
-- Listens for text messages on the WebSocket and processes file operations (list_files, etc.).
+- **Comprehensive File Management**: Full CRUD operations with atomic transactions and batch processing.
+- **Advanced Features**: Automatic backups, rollback support, path validation, and file size limits.
+- Listens for text messages on the WebSocket and processes file operations (list_files, create_file, update_file, delete_file, etc.).
 - The listening port is configurable via the `WEBSOCKET_PORT` environment variable (defaults to `4001`) using `config/runtime.exs` when run from a release.
 
 ## Security Features
 
-**⚠️ SECURE BY DEFAULT**: This server implements IPsec tunneling with security enforcement:
+**WARNING - SECURE BY DEFAULT**: This server implements IPsec tunneling with security enforcement:
 
 - **IPsec Tunneling**: Encrypted communication channel to SFTP server (10.0.100.1 ↔ 10.0.100.2)
 - **Security Enforcement**: Blocks all SFTP connections if encryption tunnel fails
@@ -123,7 +125,7 @@ The WebSocket handler must implement these callbacks:
    - Must return `{:cowboy_websocket, req, state}` 
    - Runs in HTTP request process
 
-2. **`websocket_init/1`** - WebSocket process initialization ⚠️ **CRITICAL**
+2. **`websocket_init/1`** - WebSocket process initialization **CRITICAL**
    - Called after WebSocket upgrade in a separate process
    - Must return `{:ok, state}` 
    - Always initialize fresh state here, don't rely on state from `init/2`
@@ -133,14 +135,14 @@ The WebSocket handler must implement these callbacks:
 
 ### Common Pitfalls
 
-❌ **Missing `websocket_init/1`** - Without this callback, WebSocket handlers receive `nil` state
-❌ **Wrong return values** - `init/2` must return `{:cowboy_websocket, req, state}`, not `{:ok, req, state}`
-❌ **Relying on `init/2` state** - State from HTTP process may not transfer correctly
+ERROR **Missing `websocket_init/1`** - Without this callback, WebSocket handlers receive `nil` state
+ERROR **Wrong return values** - `init/2` must return `{:cowboy_websocket, req, state}`, not `{:ok, req, state}`
+ERROR **Relying on `init/2` state** - State from HTTP process may not transfer correctly
 
 ### Architecture
 
 ```
-HTTP Request → init/2 (HTTP Process) → WebSocket Upgrade → websocket_init/1 (WebSocket Process) → websocket_handle/2
+HTTP Request -> init/2 (HTTP Process) -> WebSocket Upgrade -> websocket_init/1 (WebSocket Process) -> websocket_handle/2
 ```
 
 The HTTP and WebSocket processes are separate, so always initialize WebSocket state in `websocket_init/1`.
@@ -149,7 +151,7 @@ The HTTP and WebSocket processes are separate, so always initialize WebSocket st
 
 ```
 ┌─────────────────┐    IPsec Tunnel     ┌─────────────────┐
-│  elixir_server  │ ←══════════════════→ │   sftp_server   │
+|  elixir_server  | <=================> |   sftp_server   |
 │  (10.0.100.1)   │   Encrypted Channel  │  (10.0.100.2)   │
 │  Port: 4001     │                     │  Port: 2222     │
 └─────────────────┘                     └─────────────────┘
@@ -183,17 +185,60 @@ The HTTP and WebSocket processes are separate, so always initialize WebSocket st
 
 ### Common Issues
 
-**❌ WebSocket state is `nil`**
+**ERROR WebSocket state is `nil`**
 - **Cause:** Missing `websocket_init/1` callback
 - **Solution:** Implement proper WebSocket initialization
 
-**❌ SFTP connection blocked**
+**ERROR SFTP connection blocked**
 - **Cause:** IPsec tunnel not established (secure by default)
 - **Solution:** Ensure both servers running with matching IPsec config
 
-**❌ File operations fail**
+**ERROR File operations fail**
 - **Cause:** SFTP server not running or tunnel authentication failure
 - **Solution:** Start `sftp_server` and verify PSK matches
+
+## File Management Features
+
+### 🚀 **New FileManager Module**
+
+The server now includes a comprehensive `FileManager` module providing:
+
+#### **CRUD Operations**
+- **Create**: Files and directories with automatic parent creation
+- **Read**: File content with encoding options and size limits  
+- **Update**: Atomic file updates with automatic backups
+- **Delete**: Files and directories with optional recursive deletion
+
+#### **Advanced Features**
+- **Batch Operations**: Multiple operations in atomic transactions with rollback
+- **Security**: All operations use IPsec encrypted tunnels automatically
+- **Safety**: Path validation, overwrite protection, file size limits
+- **Reliability**: Atomic updates, automatic backups, error recovery
+
+#### **WebSocket API**
+```javascript
+// File operations
+{action: "create_file", path: "/home/user/test.txt", content: "Hello"}
+{action: "read_file", path: "/home/user/test.txt"}
+{action: "update_file", path: "/home/user/test.txt", content: "Updated"}
+{action: "delete_file", path: "/home/user/test.txt"}
+{action: "move_file", source: "/old.txt", destination: "/new.txt"}
+{action: "copy_file", source: "/source.txt", destination: "/copy.txt"}
+
+// Directory operations  
+{action: "create_directory", path: "/home/user/new_folder"}
+{action: "delete_directory", path: "/home/user/old_folder", recursive: true}
+{action: "list_files", path: "/home/user"}
+{action: "get_file_info", path: "/home/user/document.txt"}
+
+// Batch operations
+{action: "batch_operations", operations: [
+  {type: "create_file", path: "/file1.txt", content: "Content 1"},
+  {type: "move_file", source: "/old.txt", destination: "/moved.txt"}
+]}
+```
+
+See `docs/file_manager.md` for complete API documentation.
 
 ## Integration with SFTP Server
 

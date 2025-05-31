@@ -14,7 +14,7 @@ This document outlines how the Elixir backend (`DesktopIntegrationServer`) inter
 
 ```
 ┌─────────────────┐    WebSocket     ┌─────────────────┐
-│ Electron Client │ ←═════════════→ │ Elixir Server   │
+| Electron Client | <============> | Elixir Server   |
 │                 │                 │ (10.0.100.1)    │
 └─────────────────┘                 └─────────────────┘
                                              │
@@ -29,7 +29,7 @@ This document outlines how the Elixir backend (`DesktopIntegrationServer`) inter
 
 ## Configuration Management
 
-**⚠️ SIMPLIFIED APPROACH**: Single configuration file with environment variable overrides.
+**WARNING - SIMPLIFIED APPROACH**: Single configuration file with environment variable overrides.
 
 ### Configuration Files
 
@@ -150,22 +150,22 @@ end
 
 #### Critical Implementation Notes
 
-**⚠️ MUST HAVE `websocket_init/1`**
+**WARNING - MUST HAVE `websocket_init/1`**
 - Without this callback, `websocket_handle/2` receives `nil` state
 - This is the #1 cause of WebSocket handler crashes
 
-**🔄 Process Architecture**
+**Process Architecture**
 ```
-HTTP Request → init/2 (HTTP Process) → Upgrade → websocket_init/1 (WebSocket Process) → websocket_handle/2
+HTTP Request -> init/2 (HTTP Process) -> Upgrade -> websocket_init/1 (WebSocket Process) -> websocket_handle/2
 ```
 - `init/2` runs in HTTP request process
 - `websocket_*` callbacks run in separate WebSocket connection process
 - State may not transfer reliably between processes
 
-**✅ Return Value Requirements**
-- `init/2` → `{:cowboy_websocket, req, state}` (NOT `{:ok, req, state}`)
-- `websocket_init/1` → `{:ok, state}`
-- `websocket_handle/2` → `{:reply, frame, state}` or `{:ok, state}`
+**Return Value Requirements**
+- `init/2` -> `{:cowboy_websocket, req, state}` (NOT `{:ok, req, state}`)
+- `websocket_init/1` -> `{:ok, state}`
+- `websocket_handle/2` -> `{:reply, frame, state}` or `{:ok, state}`
 
 ### Message Handling
 
@@ -264,28 +264,28 @@ mix run --no-halt
 
 ### Common Issues
 
-**❌ "Invalid or missing state in websocket_handle"**
+**ERROR "Invalid or missing state in websocket_handle"**
 - **Cause:** Missing `websocket_init/1` callback
 - **Solution:** Implement `websocket_init/1` that returns `{:ok, state}`
 
-**❌ WebSocket upgrade fails silently**
+**ERROR WebSocket upgrade fails silently**
 - **Cause:** `init/2` returns `{:ok, req, state}` instead of `{:cowboy_websocket, req, state}`
 - **Solution:** Use correct return tuple for WebSocket upgrade
 
-**❌ State is always `nil`**
+**ERROR State is always `nil`**
 - **Cause:** Relying on state from `init/2` instead of initializing in `websocket_init/1`
 - **Solution:** Always create fresh state in `websocket_init/1`
 
 ### Security-Related Issues
 
-**❌ "IPsec tunnel required but not active"**
+**ERROR "IPsec tunnel required but not active"**
 - **Cause:** IPsec tunnel failed but security enforcement enabled
 - **Solution:** 
   - Ensure `sftp_server` is running and reachable
   - Check tunnel IP configuration
   - For testing: Set `IPSEC_ENFORCE_SECURITY=false`
 
-**❌ File operations return "Connection blocked for security"**
+**ERROR File operations return "Connection blocked for security"**
 - **Cause:** Security enforcement preventing unencrypted fallback
 - **Solution:**
   - Verify both servers have matching IPsec configuration

@@ -1,6 +1,7 @@
 defmodule DesktopIntegrationServer.FileStorage.SFTPAdapter do
   @behaviour DesktopIntegrationServer.FileStorage.Adapter
   require Logger
+  import Bitwise
 
   @impl DesktopIntegrationServer.FileStorage.Adapter
   def init(config) do
@@ -103,12 +104,7 @@ defmodule DesktopIntegrationServer.FileStorage.SFTPAdapter do
     host_str = conn_params.host
     port = conn_params.port
     base_remote_path = Keyword.get(config, :base_remote_path, ".")
-    full_remote_path =
-      if Path.type(remote_name) == :absolute do # Check remote_name for absolute, not remote_path_str
-        remote_name
-      else
-        Path.join(base_remote_path, remote_name)
-      end
+    full_remote_path = resolve_remote_path(remote_name, base_remote_path)
     connect_opts = build_connect_opts(config)
 
     # All connections are now secure via IPsec tunnel
@@ -146,12 +142,7 @@ defmodule DesktopIntegrationServer.FileStorage.SFTPAdapter do
     host_str = conn_params.host
     port = conn_params.port
     base_remote_path = Keyword.get(config, :base_remote_path, ".")
-    full_remote_path =
-      if Path.type(remote_name) == :absolute do # Check remote_name
-        remote_name
-      else
-        Path.join(base_remote_path, remote_name)
-      end
+    full_remote_path = resolve_remote_path(remote_name, base_remote_path)
     connect_opts = build_connect_opts(config)
 
     # All connections are now secure via IPsec tunnel
@@ -190,12 +181,7 @@ defmodule DesktopIntegrationServer.FileStorage.SFTPAdapter do
     host_str = conn_params.host
     port = conn_params.port
     base_remote_path = Keyword.get(config, :base_remote_path, ".")
-    full_remote_path =
-      if Path.type(remote_path_str) == :absolute do
-        remote_path_str
-      else
-        Path.join(base_remote_path, remote_path_str)
-      end
+    full_remote_path = resolve_remote_path(remote_path_str, base_remote_path)
     connect_opts = build_connect_opts(config)
 
     # All connections are now secure via IPsec tunnel
@@ -227,6 +213,248 @@ defmodule DesktopIntegrationServer.FileStorage.SFTPAdapter do
       {:error, reason} ->
         Logger.error("#{log_prefix} SFTP start_channel failed: #{inspect(reason)}")
         {:error, reason}
+    end
+  end
+
+  @impl DesktopIntegrationServer.FileStorage.Adapter
+  def delete_file(config, remote_path, _opts \\ []) do
+    conn_params = build_connection_params(config)
+    host_str = conn_params.host
+    port = conn_params.port
+    base_remote_path = Keyword.get(config, :base_remote_path, ".")
+    full_remote_path = resolve_remote_path(remote_path, base_remote_path)
+    connect_opts = build_connect_opts(config)
+
+    log_prefix = "[SFTPAdapter][DeleteFile][SECURE IPsec Tunnel]"
+
+    Logger.info("#{log_prefix} Request to delete: '#{full_remote_path}' on sftp://#{config[:user]}@#{host_str}:#{port}")
+    ensure_ssh_started()
+
+    case :ssh_sftp.start_channel(String.to_charlist(host_str), port, connect_opts) do
+      {:ok, sftp_channel, ssh_conn} ->
+        Logger.info("#{log_prefix} SFTP Channel and Connection established. Deleting: '#{full_remote_path}'")
+        res =
+          case :ssh_sftp.delete(sftp_channel, String.to_charlist(full_remote_path)) do
+            :ok ->
+              Logger.info("#{log_prefix} Delete successful: #{full_remote_path}")
+              {:ok, full_remote_path}
+            {:error, reason} ->
+              Logger.error("#{log_prefix} Delete failed: #{inspect(reason)}")
+              {:error, reason}
+          end
+        :ssh_sftp.stop_channel(sftp_channel)
+        :ssh.close(ssh_conn)
+        Logger.debug("#{log_prefix} SFTP channel and connection closed for '#{full_remote_path}'")
+        res
+      {:error, reason} ->
+        Logger.error("#{log_prefix} SFTP start_channel failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @impl DesktopIntegrationServer.FileStorage.Adapter
+  def create_directory(config, remote_path, _opts \\ []) do
+    conn_params = build_connection_params(config)
+    host_str = conn_params.host
+    port = conn_params.port
+    base_remote_path = Keyword.get(config, :base_remote_path, ".")
+    full_remote_path = resolve_remote_path(remote_path, base_remote_path)
+    connect_opts = build_connect_opts(config)
+
+    log_prefix = "[SFTPAdapter][CreateDirectory][SECURE IPsec Tunnel]"
+
+    Logger.info("#{log_prefix} Request to create directory: '#{full_remote_path}' on sftp://#{config[:user]}@#{host_str}:#{port}")
+    ensure_ssh_started()
+
+    case :ssh_sftp.start_channel(String.to_charlist(host_str), port, connect_opts) do
+      {:ok, sftp_channel, ssh_conn} ->
+        Logger.info("#{log_prefix} SFTP Channel and Connection established. Creating directory: '#{full_remote_path}'")
+        res =
+          case :ssh_sftp.make_dir(sftp_channel, String.to_charlist(full_remote_path)) do
+            :ok ->
+              Logger.info("#{log_prefix} Directory creation successful: #{full_remote_path}")
+              {:ok, full_remote_path}
+            {:error, reason} ->
+              Logger.error("#{log_prefix} Directory creation failed: #{inspect(reason)}")
+              {:error, reason}
+          end
+        :ssh_sftp.stop_channel(sftp_channel)
+        :ssh.close(ssh_conn)
+        Logger.debug("#{log_prefix} SFTP channel and connection closed for '#{full_remote_path}'")
+        res
+      {:error, reason} ->
+        Logger.error("#{log_prefix} SFTP start_channel failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @impl DesktopIntegrationServer.FileStorage.Adapter
+  def delete_directory(config, remote_path, _opts \\ []) do
+    conn_params = build_connection_params(config)
+    host_str = conn_params.host
+    port = conn_params.port
+    base_remote_path = Keyword.get(config, :base_remote_path, ".")
+    full_remote_path = resolve_remote_path(remote_path, base_remote_path)
+    connect_opts = build_connect_opts(config)
+
+    log_prefix = "[SFTPAdapter][DeleteDirectory][SECURE IPsec Tunnel]"
+
+    Logger.info("#{log_prefix} Request to delete directory: '#{full_remote_path}' on sftp://#{config[:user]}@#{host_str}:#{port}")
+    ensure_ssh_started()
+
+    case :ssh_sftp.start_channel(String.to_charlist(host_str), port, connect_opts) do
+      {:ok, sftp_channel, ssh_conn} ->
+        Logger.info("#{log_prefix} SFTP Channel and Connection established. Deleting directory: '#{full_remote_path}'")
+        res =
+          case :ssh_sftp.del_dir(sftp_channel, String.to_charlist(full_remote_path)) do
+            :ok ->
+              Logger.info("#{log_prefix} Directory deletion successful: #{full_remote_path}")
+              {:ok, full_remote_path}
+            {:error, reason} ->
+              Logger.error("#{log_prefix} Directory deletion failed: #{inspect(reason)}")
+              {:error, reason}
+          end
+        :ssh_sftp.stop_channel(sftp_channel)
+        :ssh.close(ssh_conn)
+        Logger.debug("#{log_prefix} SFTP channel and connection closed for '#{full_remote_path}'")
+        res
+      {:error, reason} ->
+        Logger.error("#{log_prefix} SFTP start_channel failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @impl DesktopIntegrationServer.FileStorage.Adapter
+  def move_file(config, source_path, destination_path, _opts \\ []) do
+    conn_params = build_connection_params(config)
+    host_str = conn_params.host
+    port = conn_params.port
+    base_remote_path = Keyword.get(config, :base_remote_path, ".")
+
+    full_source_path = resolve_remote_path(source_path, base_remote_path)
+    full_destination_path = resolve_remote_path(destination_path, base_remote_path)
+
+    connect_opts = build_connect_opts(config)
+
+    log_prefix = "[SFTPAdapter][MoveFile][SECURE IPsec Tunnel]"
+
+    Logger.info("#{log_prefix} Request to move: '#{full_source_path}' -> '#{full_destination_path}' on sftp://#{config[:user]}@#{host_str}:#{port}")
+    ensure_ssh_started()
+
+    case :ssh_sftp.start_channel(String.to_charlist(host_str), port, connect_opts) do
+      {:ok, sftp_channel, ssh_conn} ->
+        Logger.info("#{log_prefix} SFTP Channel and Connection established. Moving: '#{full_source_path}' -> '#{full_destination_path}'")
+        res =
+          case :ssh_sftp.rename(sftp_channel, String.to_charlist(full_source_path), String.to_charlist(full_destination_path)) do
+            :ok ->
+              Logger.info("#{log_prefix} Move successful: #{full_source_path} -> #{full_destination_path}")
+              {:ok, full_destination_path}
+            {:error, reason} ->
+              Logger.error("#{log_prefix} Move failed: #{inspect(reason)}")
+              {:error, reason}
+          end
+        :ssh_sftp.stop_channel(sftp_channel)
+        :ssh.close(ssh_conn)
+        Logger.debug("#{log_prefix} SFTP channel and connection closed for move operation")
+        res
+      {:error, reason} ->
+        Logger.error("#{log_prefix} SFTP start_channel failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @impl DesktopIntegrationServer.FileStorage.Adapter
+  def get_file_info(config, remote_path, _opts \\ []) do
+    conn_params = build_connection_params(config)
+    host_str = conn_params.host
+    port = conn_params.port
+    base_remote_path = Keyword.get(config, :base_remote_path, ".")
+    full_remote_path = resolve_remote_path(remote_path, base_remote_path)
+    connect_opts = build_connect_opts(config)
+
+    log_prefix = "[SFTPAdapter][GetFileInfo][SECURE IPsec Tunnel]"
+
+    Logger.debug("#{log_prefix} Request to get file info: '#{full_remote_path}' on sftp://#{config[:user]}@#{host_str}:#{port}")
+    ensure_ssh_started()
+
+    case :ssh_sftp.start_channel(String.to_charlist(host_str), port, connect_opts) do
+      {:ok, sftp_channel, ssh_conn} ->
+        Logger.debug("#{log_prefix} SFTP Channel and Connection established. Getting file info: '#{full_remote_path}'")
+        res =
+          case :ssh_sftp.read_file_info(sftp_channel, String.to_charlist(full_remote_path)) do
+            {:ok, file_info} ->
+              processed_info = %{
+                name: Path.basename(full_remote_path),
+                type: determine_file_type(file_info),
+                size: file_info.size,
+                modified: convert_erlang_datetime(file_info.mtime),
+                permissions: format_permissions(file_info.mode),
+                path: full_remote_path
+              }
+              Logger.debug("#{log_prefix} File info retrieved successfully: #{full_remote_path}")
+              {:ok, processed_info}
+            {:error, reason} ->
+              Logger.error("#{log_prefix} File info retrieval failed: #{inspect(reason)}")
+              {:error, reason}
+          end
+        :ssh_sftp.stop_channel(sftp_channel)
+        :ssh.close(ssh_conn)
+        Logger.debug("#{log_prefix} SFTP channel and connection closed for '#{full_remote_path}'")
+        res
+      {:error, reason} ->
+        Logger.error("#{log_prefix} SFTP start_channel failed: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  @impl DesktopIntegrationServer.FileStorage.Adapter
+  def exists?(config, remote_path, _opts \\ []) do
+    case get_file_info(config, remote_path) do
+      {:ok, _} -> {:ok, true}
+      {:error, :enoent} -> {:ok, false}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Helper functions for file info processing
+  defp determine_file_type(file_info) do
+    case file_info.type do
+      :regular -> :file
+      :directory -> :directory
+      :symlink -> :symlink
+      _ -> :file
+    end
+  end
+
+  defp convert_erlang_datetime({{year, month, day}, {hour, minute, second}}) do
+    case DateTime.new(Date.new!(year, month, day), Time.new!(hour, minute, second)) do
+      {:ok, datetime} -> datetime
+      {:error, _} -> DateTime.utc_now()
+    end
+  end
+
+  defp format_permissions(mode) when is_integer(mode) do
+    # Convert mode to octal string representation
+    # Use bitwise AND to mask to permission bits only (last 9 bits)
+    Integer.to_string(mode &&& 0o777, 8)
+  end
+
+  defp format_permissions(_), do: "644"
+
+  # Helper function to resolve remote paths correctly
+  defp resolve_remote_path(remote_path, base_remote_path) do
+    cond do
+      # If the path is already absolute, use it as-is
+      Path.type(remote_path) == :absolute ->
+        remote_path
+
+      # If the remote path already starts with the base path, don't double-join
+      String.starts_with?(remote_path, base_remote_path) ->
+        remote_path
+
+      # Otherwise, join the base path with the remote path
+      true ->
+        Path.join(base_remote_path, remote_path)
     end
   end
 

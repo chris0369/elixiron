@@ -17,6 +17,30 @@ defmodule DesktopIntegrationServer.FileStorage do
     call_adapter_func(configured_adapter_module(), :list_files, [remote_path, opts])
   end
 
+  def delete_file(remote_path, opts \\ []) do
+    call_adapter_func(configured_adapter_module(), :delete_file, [remote_path, opts])
+  end
+
+  def create_directory(remote_path, opts \\ []) do
+    call_adapter_func(configured_adapter_module(), :create_directory, [remote_path, opts])
+  end
+
+  def delete_directory(remote_path, opts \\ []) do
+    call_adapter_func(configured_adapter_module(), :delete_directory, [remote_path, opts])
+  end
+
+  def move_file(source_path, destination_path, opts \\ []) do
+    call_adapter_func(configured_adapter_module(), :move_file, [source_path, destination_path, opts])
+  end
+
+  def get_file_info(remote_path, opts \\ []) do
+    call_adapter_func(configured_adapter_module(), :get_file_info, [remote_path, opts])
+  end
+
+  def exists?(remote_path, opts \\ []) do
+    call_adapter_func(configured_adapter_module(), :exists?, [remote_path, opts])
+  end
+
   # Private helper to get the configured adapter module
   defp configured_adapter_module do
     Application.get_env(:desktop_integration_server, __MODULE__, [])
@@ -69,4 +93,28 @@ defmodule DesktopIntegrationServer.FileStorage.Adapter do
   @doc "Lists files/directories in a remote path."
   @callback list_files(state :: any(), remote_path :: String.t(), opts :: keyword()) ::
               {:ok, [String.t()]} | {:error, reason :: any()} # List of file/dir names as strings
+
+  @doc "Deletes a file from the remote storage."
+  @callback delete_file(state :: any(), remote_path :: String.t(), opts :: keyword()) ::
+              {:ok, String.t()} | {:error, reason :: any()} # Returns deleted path
+
+  @doc "Creates a directory in the remote storage."
+  @callback create_directory(state :: any(), remote_path :: String.t(), opts :: keyword()) ::
+              {:ok, String.t()} | {:error, reason :: any()} # Returns created directory path
+
+  @doc "Deletes a directory from the remote storage."
+  @callback delete_directory(state :: any(), remote_path :: String.t(), opts :: keyword()) ::
+              {:ok, String.t()} | {:error, reason :: any()} # Returns deleted directory path
+
+  @doc "Moves/renames a file or directory in the remote storage."
+  @callback move_file(state :: any(), source_path :: String.t(), destination_path :: String.t(), opts :: keyword()) ::
+              {:ok, String.t()} | {:error, reason :: any()} # Returns destination path
+
+  @doc "Gets file information/stats from the remote storage."
+  @callback get_file_info(state :: any(), remote_path :: String.t(), opts :: keyword()) ::
+              {:ok, map()} | {:error, reason :: any()} # Returns file info map
+
+  @doc "Checks if a file or directory exists in the remote storage."
+  @callback exists?(state :: any(), remote_path :: String.t(), opts :: keyword()) ::
+              {:ok, boolean()} | {:error, reason :: any()} # Returns existence boolean
 end

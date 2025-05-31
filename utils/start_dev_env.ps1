@@ -116,44 +116,50 @@ mix deps.get
 mix compile
 Pop-Location
 
-# --- 5. Start Servers with IPsec Tunnel ---
+# --- 5. Start Servers with Proper Logging ---
 Write-Host ""
 Write-Host "Starting SFTP server with IPsec tunnel..." -ForegroundColor Cyan
+
+# Start SFTP server in a new PowerShell window with logging
 $sftpCmd = @"
-Start-Transcript -Path '$sftpLogFile' -Force
-Write-Host 'SFTP Server Log Started - `$(Get-Date)' -ForegroundColor Green
 cd '$sftpServerPath'
-mix run --no-halt
+Write-Host 'SFTP Server starting at `$(Get-Date)' -ForegroundColor Green
+Write-Host 'Logging to: $sftpLogFile' -ForegroundColor Gray
+mix run --no-halt 2>&1 | Tee-Object -FilePath '$sftpLogFile' -Append
 "@
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "$sftpCmd" -WindowStyle Normal
 
 Write-Host "Waiting for SFTP server to initialize..." -ForegroundColor Gray
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 5
 
 Write-Host ""
 Write-Host "Starting Elixir server with IPsec tunnel..." -ForegroundColor Cyan
+
+# Start Elixir server in a new PowerShell window with logging
 $elixirCmd = @"
-Start-Transcript -Path '$elixirLogFile' -Force
-Write-Host 'Elixir Server Log Started - `$(Get-Date)' -ForegroundColor Green
 cd '$elixirServerPath'
-mix run --no-halt
+Write-Host 'Elixir Server starting at `$(Get-Date)' -ForegroundColor Green
+Write-Host 'Logging to: $elixirLogFile' -ForegroundColor Gray
+mix run --no-halt 2>&1 | Tee-Object -FilePath '$elixirLogFile' -Append
 "@
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "$elixirCmd" -WindowStyle Normal
 
 Write-Host "Waiting for Elixir server to initialize..." -ForegroundColor Gray
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 5
 
 # --- 6. Start Electron App ---
 Write-Host ""
 Write-Host "Setting up and starting Electron app..." -ForegroundColor Cyan
+
+# Start Electron app in a new PowerShell window with logging
 $electronCmd = @"
-Start-Transcript -Path '$electronLogFile' -Force
-Write-Host 'Electron App Log Started - `$(Get-Date)' -ForegroundColor Green
 cd '$electronAppPath'
+Write-Host 'Electron App starting at `$(Get-Date)' -ForegroundColor Green
+Write-Host 'Logging to: $electronLogFile' -ForegroundColor Gray
 Write-Host 'Installing dependencies...' -ForegroundColor Gray
-npm install
+npm install 2>&1 | Tee-Object -FilePath '$electronLogFile' -Append
 Write-Host 'Starting Electron app...' -ForegroundColor White
-npm start
+npm start 2>&1 | Tee-Object -FilePath '$electronLogFile' -Append
 "@
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "$electronCmd" -WindowStyle Normal
 
@@ -161,22 +167,32 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "$electronCmd" -Wi
 Write-Host ""
 Write-Host "COMPLETE: Development environment started successfully!" -ForegroundColor Green
 Write-Host ""
+Write-Host "PowerShell Windows Opened:" -ForegroundColor White
+Write-Host "  SFTP Server:   New PowerShell window with real-time output" -ForegroundColor Green
+Write-Host "  Elixir Server: New PowerShell window with real-time output" -ForegroundColor Green
+Write-Host "  Electron App:  New PowerShell window with real-time output" -ForegroundColor Green
+Write-Host ""
 Write-Host "Log Files Created:" -ForegroundColor White
 Write-Host "  SFTP Server:   $sftpLogFile" -ForegroundColor Green
 Write-Host "  Elixir Server: $elixirLogFile" -ForegroundColor Green
 Write-Host "  Electron App:  $electronLogFile" -ForegroundColor Green
-Write-Host ""
-Write-Host "Expected security status in server logs:" -ForegroundColor White
-Write-Host "  SUCCESS: [IPsecManager] Initial tunnel setup completed" -ForegroundColor Green
-Write-Host "  SUCCESS: [SftpServer] Using secure IPsec tunnel binding" -ForegroundColor Green
-Write-Host "  SUCCESS: [SFTPAdapter] [SECURE IPsec Tunnel] File operations" -ForegroundColor Green
 Write-Host ""
 Write-Host "Monitor logs with:" -ForegroundColor Cyan
 Write-Host "  Get-Content -Path '$sftpLogFile' -Wait" -ForegroundColor Gray
 Write-Host "  Get-Content -Path '$elixirLogFile' -Wait" -ForegroundColor Gray
 Write-Host "  Get-Content -Path '$electronLogFile' -Wait" -ForegroundColor Gray
 Write-Host ""
+Write-Host "Check server status with:" -ForegroundColor Cyan
+Write-Host "  .\utils\check_server_status.ps1" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Expected security status in server logs:" -ForegroundColor White
+Write-Host "  SUCCESS: [IPsecManager] Initial tunnel setup completed" -ForegroundColor Green
+Write-Host "  SUCCESS: [SftpServer] Using secure IPsec tunnel binding" -ForegroundColor Green
+Write-Host "  SUCCESS: [SFTPAdapter] [SECURE IPsec Tunnel] File operations" -ForegroundColor Green
+Write-Host ""
 Write-Host "If you see security errors:" -ForegroundColor Yellow
-Write-Host "  - Check that both server windows opened successfully" -ForegroundColor Gray
+Write-Host "  - Check that both server windows are running" -ForegroundColor Gray
 Write-Host "  - Verify tunnel setup: ipconfig | findstr '127.0.0.2'" -ForegroundColor Gray
-Write-Host "  - See DEVSECOPS_SETUP.md for troubleshooting" -ForegroundColor Gray 
+Write-Host "  - Monitor logs: Get-Content -Path '$elixirLogFile' -Wait" -ForegroundColor Gray
+Write-Host ""
+Write-Host "To stop servers: Close the PowerShell windows or press Ctrl+C in each window." -ForegroundColor Cyan 

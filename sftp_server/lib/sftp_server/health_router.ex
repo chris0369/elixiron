@@ -55,7 +55,7 @@ defmodule SftpServer.HealthRouter do
         erlang_version: System.version(),
         elixir_version: System.version(),
         node_name: Node.self(),
-        memory_usage: :erlang.memory(),
+        memory_usage: :erlang.memory() |> Enum.into(%{}),
         process_count: :erlang.system_info(:process_count)
       },
       application_info: %{

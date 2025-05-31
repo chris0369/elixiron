@@ -22,7 +22,7 @@ This repository contains an Elixir + Electron project with SFTP server capabilit
 4. **Environment Variables**
    - `.env` files containing passwords, tokens, or API keys
 
-### 🏗️ Build Artifacts - Excluded for Performance
+### Build Artifacts - Excluded for Performance
 
 1. **Node.js Dependencies**
    - `electron_app/node_modules/` - Large dependency tree

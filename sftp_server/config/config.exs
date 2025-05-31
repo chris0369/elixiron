@@ -79,4 +79,4 @@ config :sftp_server, :ipsec_daemon,
   # Authentication
   auth_by: System.get_env("IPSEC_AUTH_BY", "secret") # Authentication method
 
-IO.puts "config/config.exs loaded. SFTP server configured with single-machine development tunnel (127.0.0.2 ↔ 127.0.0.1)."
+IO.puts "config/config.exs loaded. SFTP server configured with single-machine development tunnel (127.0.0.2 <-> 127.0.0.1)."

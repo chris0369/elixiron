@@ -8,7 +8,7 @@ This guide provides a complete setup for secure IPsec tunnel development and dep
 
 ```
 ┌─────────────────┐    IPsec Tunnel     ┌─────────────────┐
-│  elixir_server  │ ←══════════════════→ │   sftp_server   │
+|  elixir_server  | <=================> |   sftp_server   |
 │   127.0.0.1     │   AES-256 Encrypted │   127.0.0.2     │
 │   Port: 4001    │                     │   Port: 2222    │
 └─────────────────┘                     └─────────────────┘
@@ -131,7 +131,7 @@ mix run --no-halt
 
 ### Common Issues
 
-**❌ "IPsec tunnel required but not active"**
+**ERROR "IPsec tunnel required but not active"**
 
 ```powershell
 # Check tunnel setup
@@ -145,14 +145,14 @@ ping 127.0.0.1
 ping 127.0.0.2
 ```
 
-**❌ "Access denied" (Setup Script)**
+**ERROR "Access denied" (Setup Script)**
 
 ```powershell
 # Run PowerShell as Administrator
-# Right-click PowerShell → "Run as Administrator"
+# Right-click PowerShell -> "Run as Administrator"
 ```
 
-**❌ File operations fail**
+**ERROR File operations fail**
 
 ```
 # Verify both servers running
@@ -180,9 +180,8 @@ netsh interface ipv4 show addresses
 ### Security Monitoring
 
 **Connection Status:**
-- `[SECURE IPsec Tunnel]` - ✅ Encrypted connection active
-- `[SECURITY ENFORCED]` - ❌ Connection blocked (tunnel failed)
-- `[Standard Connection]` - ⚠️ Unencrypted fallback (development only)
+- `[SECURE IPsec Tunnel]` - SUCCESS Encrypted connection active
+- `[SECURITY ENFORCED]` - ERROR Connection blocked (tunnel failed)
 
 ## CI/CD Integration
 
@@ -234,18 +233,18 @@ get_secure_binding_params() :: {:ok, params} | {:error, reason}
 ## Security Best Practices
 
 ### Development
-- ✅ Keep security enforcement enabled
-- ✅ Use unique PSK per team/environment
-- ✅ Test with tunnel active (never disable IPsec)
-- ✅ Monitor security status in logs
+- SUCCESS Keep security enforcement enabled
+- SUCCESS Use unique PSK per team/environment
+- SUCCESS Test with tunnel active (never disable IPsec)
+- SUCCESS Monitor security status in logs
 
 ### Production  
-- ✅ Generate unique PSK per deployment
-- ✅ Use dedicated tunnel network
-- ✅ Enable network monitoring
-- ✅ Regular tunnel health checks
-- ✅ Firewall rules blocking direct access
+- SUCCESS Generate unique PSK per deployment
+- SUCCESS Use dedicated tunnel network
+- SUCCESS Enable network monitoring
+- SUCCESS Regular tunnel health checks
+- SUCCESS Firewall rules blocking direct access
 
 ---
 
-**⚠️ SECURITY NOTICE**: When `enforce_security` is enabled (default), ALL SFTP traffic will be blocked if the IPsec tunnel is not active. This prevents accidental data transmission over unencrypted connections. 
+**WARNING - SECURITY NOTICE**: When `enforce_security` is enabled (default), ALL SFTP traffic will be blocked if the IPsec tunnel is not active. This prevents accidental data transmission over unencrypted connections. 

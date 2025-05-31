@@ -2,48 +2,519 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Electron Elixir WebSocket Test</title>
+  <title>Electron File Manager - SFTP Operations</title>
   <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
   <style>
-    body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-    .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    h1, h2 { color: #333; }
-    .controls button { margin: 5px; padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
-    .controls button:hover { background-color: #0056b3; }
-    .status-indicator { margin-top: 10px; padding: 10px; border-radius: 4px; }
-    .status-connected { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-    .status-disconnected { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-    .status-error { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-    .messages, .file-list-container { margin-top: 20px; }
-    #messageList, #fileList { list-style-type: none; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; background-color: #f9f9f9;}
-    #messageList li, #fileList li { padding: 8px; border-bottom: 1px solid #eee; }
-    #messageList li:last-child, #fileList li:last-child { border-bottom: none; }
-    #messageList .client-msg { color: blue; }
-    #messageList .server-msg { color: green; }
-    #messageList .error-msg { color: red; font-weight: bold; }
+    :root {
+      --bg-primary: #1e1e1e;
+      --bg-secondary: #252526;
+      --bg-tertiary: #2d2d30;
+      --text-primary: #cccccc;
+      --text-secondary: #969696;
+      --accent-blue: #007acc;
+      --accent-blue-hover: #1177bb;
+      --border-color: #3e3e42;
+      --editor-bg: #1e1e1e;
+      --error-color: #f48771;
+      --success-color: #4ec9b0;
+      --warning-color: #dcdcaa;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .header {
+      background-color: var(--bg-secondary);
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-primary);
+    }
+
+    .connection-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--error-color);
+    }
+
+    .status-dot.connected {
+      background-color: var(--success-color);
+    }
+
+    .status-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .connection-btn {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .connection-btn:hover {
+      background: var(--accent-blue-hover);
+    }
+
+    .connection-btn:disabled {
+      background: var(--border-color);
+      cursor: not-allowed;
+    }
+
+    /* Main Layout */
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* File Explorer Sidebar */
+    .file-explorer {
+      width: 280px;
+      background-color: var(--bg-secondary);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .explorer-header {
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .explorer-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .explorer-action {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 2px;
+      font-size: 12px;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+
+    .explorer-action:hover {
+      opacity: 1;
+      background-color: var(--bg-tertiary);
+    }
+
+    .file-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      padding: 2px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      user-select: none;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .tree-item:hover {
+      background-color: var(--bg-tertiary);
+    }
+
+    .tree-item.selected {
+      background-color: var(--accent-blue);
+      color: white;
+    }
+
+    .tree-item.directory {
+      font-weight: 500;
+    }
+
+    .tree-item.file {
+      color: var(--text-secondary);
+    }
+
+    .tree-expand {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 2px;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+
+    .tree-expand:hover {
+      background-color: var(--bg-tertiary);
+    }
+
+    .tree-expand::before {
+      content: '▶';
+      font-size: 8px;
+      color: var(--text-secondary);
+      transition: transform 0.2s;
+    }
+
+    .tree-expand.expanded::before {
+      transform: rotate(90deg);
+    }
+
+    .tree-expand.empty {
+      visibility: hidden;
+    }
+
+    .tree-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+
+    .tree-icon.folder {
+      color: #dcb67a;
+    }
+
+    .tree-icon.file {
+      color: var(--text-secondary);
+    }
+
+    .tree-children {
+      margin-left: 16px;
+    }
+
+    .tree-children.collapsed {
+      display: none;
+    }
+
+    /* Editor Area */
+    .editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--editor-bg);
+    }
+
+    .editor-tabs {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      min-height: 32px;
+      overflow-x: auto;
+    }
+
+    .editor-tab {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-right: 1px solid var(--border-color);
+      cursor: pointer;
+      font-size: 13px;
+      background-color: var(--bg-tertiary);
+      color: var(--text-secondary);
+      white-space: nowrap;
+      min-width: 120px;
+      position: relative;
+    }
+
+    .editor-tab.active {
+      background-color: var(--editor-bg);
+      color: var(--text-primary);
+    }
+
+    .editor-tab.dirty::after {
+      content: '●';
+      margin-left: 6px;
+      color: var(--text-secondary);
+    }
+
+    .tab-close {
+      margin-left: auto;
+      padding-left: 8px;
+      opacity: 0.7;
+      cursor: pointer;
+    }
+
+    .tab-close:hover {
+      opacity: 1;
+    }
+
+    .editor-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .editor-textarea {
+      flex: 1;
+      background-color: var(--editor-bg);
+      color: var(--text-primary);
+      border: none;
+      outline: none;
+      padding: 16px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      resize: none;
+      white-space: pre;
+      overflow-wrap: normal;
+      overflow: auto;
+    }
+
+    .editor-welcome {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .editor-status {
+      background-color: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      min-width: 160px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .context-menu-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .context-menu-item:hover {
+      background-color: var(--accent-blue);
+    }
+
+    .context-menu-separator {
+      height: 1px;
+      background-color: var(--border-color);
+      margin: 2px 0;
+    }
+
+    /* Footer/Messages */
+    .messages-panel {
+      background-color: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      height: 120px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .messages-header {
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .messages-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+    }
+
+    .message-item {
+      padding: 2px 12px;
+      font-size: 12px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      border-left: 3px solid transparent;
+    }
+
+    .message-item.info {
+      color: var(--text-secondary);
+    }
+
+    .message-item.success {
+      color: var(--success-color);
+      border-left-color: var(--success-color);
+    }
+
+    .message-item.error {
+      color: var(--error-color);
+      border-left-color: var(--error-color);
+    }
+
+    .message-item.warning {
+      color: var(--warning-color);
+      border-left-color: var(--warning-color);
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-primary);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* Loading States */
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--border-color);
+      border-radius: 50%;
+      border-top-color: var(--accent-blue);
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Electron & Elixir WebSocket Communication</h1>
-    <div class="status-indicator" id="statusIndicator">Not Connected</div>
-    
-    <div class="controls">
-      <button id="connectWs">Connect WebSocket</button>
-      <button id="disconnectWs">Disconnect WebSocket</button>
-      <button id="sendMessage">Send Test JSON Message</button>
-      <button id="refreshFileList">Refresh File List</button>
+  <!-- Header -->
+  <div class="header">
+    <h1>File Manager</h1>
+    <div class="connection-status">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">Disconnected</span>
+      <button class="connection-btn" id="connectBtn">Connect</button>
+    </div>
+  </div>
+
+  <!-- Main Layout -->
+  <div class="main-container">
+    <!-- File Explorer Sidebar -->
+    <div class="file-explorer">
+      <div class="explorer-header">
+        <span>Explorer</span>
+        <div class="explorer-actions">
+          <button class="explorer-action" id="refreshTreeBtn" title="Refresh">↻</button>
+          <button class="explorer-action" id="collapseAllBtn" title="Collapse All">⊟</button>
+        </div>
+      </div>
+      <div class="file-tree" id="fileTree">
+        <!-- File tree will be populated here -->
+      </div>
     </div>
 
-    <div class="messages">
-      <h2>Messages:</h2>
-      <ul id="messageList"></ul>
+    <!-- Editor Area -->
+    <div class="editor-container">
+      <div class="editor-tabs" id="editorTabs">
+        <!-- Tabs will be populated here -->
+      </div>
+      <div class="editor-content" id="editorContent">
+        <div class="editor-welcome" id="editorWelcome">
+          Select a file to start editing
+        </div>
+      </div>
+      <div class="editor-status" id="editorStatus">
+        <span id="statusLeft">Ready</span>
+        <span id="statusRight"></span>
+      </div>
     </div>
+  </div>
 
-    <div class="file-list-container">
-      <h2>Server Files (SFTP Base Path):</h2>
-      <ul id="fileList"></ul>
+  <!-- Messages Panel -->
+  <div class="messages-panel">
+    <div class="messages-header">
+      <span>Output</span>
+      <button class="explorer-action" id="clearMessagesBtn" title="Clear">✕</button>
     </div>
+    <div class="messages-content" id="messagesContent">
+      <!-- Messages will be populated here -->
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div class="context-menu" id="contextMenu">
+    <!-- Context menu items will be populated dynamically -->
   </div>
 
   <script src="renderer.js"></script>
